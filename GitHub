@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: theos/theos:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare THEOS env
+        run: |
+          echo "THEOS=${THEOS:-/usr/local/theos}" >> "$GITHUB_ENV"
+
+      - name: Download iOS SDK
+        run: |
+          mkdir -p "$THEOS/sdks"
+          ok=0
+          for v in 17.5 16.5 15.5; do
+            url="https://github.com/theos/sdks/releases/download/latest/iPhoneOS${v}.sdk.tar.xz"
+            echo "Trying $url"
+            if curl -fsSL -o sdk.tar.xz "$url"; then
+              ok=1
+              echo "SDK iPhoneOS${v} downloaded"
+              break
+            fi
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::无法下载 iOS SDK，请检查 theos/sdks 仓库的 Release 资产名"
+            exit 1
+          fi
+          tar -xJf sdk.tar.xz -C "$THEOS/sdks"
+
+      - name: Build
+        run: make package FINALPACKAGE=1
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: KPCursor-deb
+          path: packages/*.deb
