@@ -1,4 +1,4 @@
-// Tweak.xm — 便捷光标 (KPCursor) 独立插件
+\// Tweak.xm — 便捷光标 (KPCursor) 独立插件
 //
 // 功能：
 //   1. 从屏幕底部（左侧或右侧）向上滑动，超过设定距离后唤出鼠标式光标；
@@ -17,19 +17,23 @@
 #import <mach/mach_time.h>
 
 // ================= IOHIDEvent 私有接口（模拟触摸点击用） =================
-// 声明来源：IOHIDEventTypes.h / IOHIDEventSystemClient.h（越狱社区通用做法，如 FakeTouch）
+// 声明来源：IOHIDEventSystemClient.h / IOHIDEvent.h / IOHIDEventTypes.h（越狱社区通用做法，如 FakeTouch）
+// 关键点：真实符号是 C 符号（Apple 头文件用 extern "C" 包裹），必须以 extern "C" 声明；
+//         参数类型必须与私有头文件一致（坐标为 double），否则运行时找不到符号或坐标错乱。
 typedef struct __IOHIDEvent *IOHIDEventRef;
 typedef struct __IOHIDEventSystemClient *IOHIDEventSystemClientRef;
 
+extern "C" {
 IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
 IOHIDEventRef IOHIDEventCreateDigitizerEvent(CFAllocatorRef allocator,
-    uint64_t timeStamp, uint64_t senderID, uint32_t type,
+    uint64_t timeStamp, uint32_t type,
     uint32_t index, uint32_t identity, uint32_t eventMask,
-    uint32_t x, uint32_t y, uint32_t z, uint32_t buttons,
-    uint32_t xRange, uint32_t yRange, uint32_t zRange,
-    uint32_t pressure, uint32_t auxPressure, uint32_t displayID);
+    uint32_t buttonMask, double x, double y, double z,
+    double tipPressure, double barrelPressure,
+    unsigned char range, unsigned char touch, unsigned int options);
 void IOHIDEventSetFloatValue(IOHIDEventRef event, uint32_t field, float value);
 void IOHIDEventSystemClientDispatchEvent(IOHIDEventSystemClientRef client, IOHIDEventRef event);
+}
 
 // 常量（来自 IOHIDEventTypes.h）
 enum {
@@ -319,8 +323,10 @@ static NSString * const KPCKeyKeen         = @"keen";          // 3-8
         : (kIOHIDDigitizerEventRange | kIOHIDDigitizerEventTouch);
 
     IOHIDEventRef event = IOHIDEventCreateDigitizerEvent(kCFAllocatorDefault,
-        mach_absolute_time(), 0, kIOHIDDigitizerTransducerTypeHand,
-        0, 1, mask, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        mach_absolute_time(), kIOHIDDigitizerTransducerTypeHand,
+        0, 1, mask, 0,
+        0, 0, 0, 0, 0,   // x, y, z, tipPressure, barrelPressure（double）
+        true, true, 0);  // range, touch, options
 
     IOHIDEventSetFloatValue(event, kIOHIDEventFieldDigitizerX, pt.x * scale);
     IOHIDEventSetFloatValue(event, kIOHIDEventFieldDigitizerY, pt.y * scale);
