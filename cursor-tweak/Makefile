@@ -13,6 +13,8 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = KPCCursor
 KPCCursor_FILES = Tweak.xm
 KPCCursor_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variable
+# 允许链接 iOS 私有 API（IOHIDEvent 系列符号运行时由 SpringBoard 进程解析）
+KPCCursor_LDFLAGS = -undefined dynamic_lookup
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
