@@ -40,7 +40,7 @@ jobs:
           echo "iVBORw0KGgoAAAANSUhEUgAAAHQAAAB0CAYAAABUmhYnAAAC3klEQVR4nO3cMW7bMBiG4V9GJ+9eix6iR+ohegQfokfyIYqs2ru2Q6HAiUWKkkiJ34f3HROLEPTgpxxYzhAN+v7zz98W67r1uF+H2mtWWRDAOtUA3rUAkG3aA7vpQCCPaQvsqgOAPKc1sJfSF4J5XmuufREomOdXarAICmY/lVhkQcHsryWTJCiY/ZazmQUFs/9SRi+gYOo0Z1X8Zwtp9AGU6dTrsxkTatY7KNOp27MdE2rWJYLpdGgyZELNAtQsQM0auH96xYSaBahZgJoFqFmAmgWoWYCaBahZgJoFqFmAmgWoWYCaBahZgJoFqFmAmgWoWV/OPoEW/f71Nfv7bz/eDjqT47MBXUJMvdYNVx50DWTueBdY6XvoXsxWa52ZLGgLAAdUyS235MKP4zj789vttri28vYr96B1DjOFmCqHq4oqteXWxFw6RnX7lQFNXeBxHDdhlhyviCoDSmVJgOams1YuUyoBOldNzJZrHp0sKM3XPWgPW14P51Ba96Bztdwa1bddSVBKB6hZgJoFqFmAmiUJuvQRWK9rH1H3oD18jNXDOZTWPSitSxa0xdaovt1GiICmtryaAKm1lLbbCBFQKk8GNDeleyY1d7zadEYIgUbkL/AWVMeHxOSe+oto+xhnhC5mhChoRLvPKJUxI8S23OdaXHh1zAhh0Ii6AA6YEaJfhXhugti6BbtATsmDTj3D8IVfs5zBlpK+h9JrgJoFqFmAmgWoWYCaBahZgJoFqFmAmgWoWYCaBahZgJoFqFmAmgWoWYCaBahZgJp1edyvw9knQXV63K8DE2oWoGYBatYl4v/ee/aJ0L4mQybUrHdQplS3Zzsm1KwPoEypXp/NmFCzXkCZUp3mrGYnFNT+Sxklt1xQ+y1nk72HgtpfSyaLb4pA7acSi6J3uaCeX6lB8Z8toJ7Xmmu/CUn138mptWWIdk0dsG3asxtW2UaBrVON21qT+yLAZbV4X/IP+iz3LKo1/tQAAAAASUVORK5CYII=" | base64 -d > work/var/jb/Library/PreferenceBundles/KPCCursorPrefs.bundle/icon@2x.png
           sed -i 's/^Version: 1.0-0/Version: 1.0-1/' work/DEBIAN/control
           rm -f "$DEB"
-          dpkg-deb -Z lzma -b work "$DEB"
+          dpkg-deb -Z xz -b work "$DEB"
           echo "== 最终包文件清单 =="
           dpkg-deb -c "$DEB"
 
