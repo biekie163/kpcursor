@@ -14,7 +14,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 官方安装脚本：自动装 Theos + 工具链 + iOS SDK（CI 环境自动跳过所有提问）
       - name: Install Theos
         run: |
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
@@ -22,11 +21,10 @@ jobs:
       - name: Set THEOS env
         run: echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
-      # 双架构：arm64 + arm64e（arm64e 设备如 iPhone 14 Pro Max 必须）
       - name: Build package
         run: make package FINALPACKAGE=1 ARCHS="arm64 arm64e"
 
-      - name: 注入设置页文件并重打包（版本升为 1.0-2）
+      - name: 注入设置页文件并重打包（版本升为 1.0-3）
         run: |
           set -e
           DEB=$(ls packages/*.deb)
@@ -40,7 +38,7 @@ jobs:
           echo "iVBORw0KGgoAAAANSUhEUgAAAB0AAAAdCAYAAABWk2cPAAACFUlEQVR42r3XS2gTQRzH8T8K2pN7sFBPamusVnxXrU+2oCKepSAqER9YKopSFGvF4oOU9CC9CHoQ1oOPg8r05k0vHkzaXqviE6zePNhDPX7dSWm7O5PEWZvkDx+WSeb//4WEsLMikfKafL8lrdTuAagUPU/PFbPm13leqiMIdmahWvR8nTMTmjoUBDv6odp0TiFwUaPvb89AVPpBfF1JOk+ajyjVdhuiRr/B01z8tUrRebLtFphGvlKo0fC6d8B+f65k6w0wTYfqmvgDR+/be+ZCtvSBaeQLVt15ae/7X9J6HUzFQnW9HoP2jL0/Kdl8DUzDJUJ1vf8Jh+/aPUnIpl4wDX+mbE1MQt9zu8+VbOwB079Cp+vRG7vXhWy4AibX0MLX/QMOZu0Z5cj6y2DKfyodMv4LTt6L6xi0Z5Qj6y6BKRo6lIffk/HgAxm7JwlZ2w2m/Mep4So/tdbXaGWH7J4kZM1FMOXCUJWbXfc+iYe+G7d7kpCWC+GN1nD1cXzd1mP/tvtu2n2uZPV5cDH2PR7a/8KtrxhZdQ5cPHwVD9UfwrXXJM1nw3ucg2ODs4FvP0DmmVtfMbKyC1x1hf/J1m73/aVIqjM8u9SYrDgDtSYN+5VqOg21ovOkbonvN56CWtF5hWNo/Z4gWH4Cqk3nzBy25y3wvMW7gmDZcagWPV/nWI8XCxt8v75dqaVpqBQ9T8+N5vwF86LJQeGZUrQAAAAASUVORK5CYII=" | base64 -d > work/var/jb/Library/PreferenceBundles/KPCCursorPrefs.bundle/icon.png
           echo "iVBORw0KGgoAAAANSUhEUgAAADoAAAA6CAYAAADhu0ooAAAEGElEQVR42uWbXWwUVRTHDxAJgkkFIwICtZSvUspCt9AWiDHBQAjImmhITJSRz6rgB4K0fJZaW0p5mEgoBWpi/Eh8sYDERIvCxcSEoOHJpALRTKJFnyTBRH38e07N1hbamcPune3u9CS/ydnOnXvOr3PT3oe7RAExrjiRKHjKdUuqjFnaDGQT0pP0Jj1SqjE+7jhlNZ635DCQC0iv0rNacMSovLy5W4xZ0sQT5CDSuzj4So6eGIvFd3ne4kNALiMO4jLgmyyNgGQScen3zRZvMqayEYgS4tRH8uFSx6ls4JsRRNx6RBfs9LyKdwA/3PPAC23+Y7IRceuWHFuUSGgeaPsG3eF25J6sOFL+StctrweCSIpKXLoGLGsOfiZbEEcqWm9M+dv8gwDaLqFPXP8deP5k8HPZgDjSojpAw6k7RCX+/AeoO6t7frBJSzQZn1zOAdGFBwENpwx8Q5byGlc312BAC2s5URAkmlzKVe/r5ss0VHaAd/4KTl6EOmSsdt5MQfH9vAlWcC+iEqYTeKJBN3cmCE1U4uYt4LmWLBEt3cc7fQUnLiDlqG3X1QgTKt3LiYJ0RCXOXQUer9fVCgNasIc3vgpOfI2049pvwKojunq2yaho97+gv4HtHw2C6PzdgIZWS6LJ+PhbXV1b0PwaThS0fgXr8f3PwNKDuvrpQrFqQEMYosmlvPZdXQ/pQLFdnChoPY9Qo/mcro9UoXl80XA8DdGuP4Dvfgrm8Ge6XlKB5r3FiYJ0RH+8qasRJlSyE9BwvMNHpCtYdkWDrk5YUMkOThQMJCqSi3mLdeEHf9Gms7o6YUFz+aKhpaN/ycq9/90XEd/l26WrExZU/CagoeXLuxuv2PP//eX1wctXxmjr2YaKt3OioLdoj+QdY+Svq18cOqOrFQY05w1Aw7Eveknu7n/MmSvBy1dbzzY053VOFIioNFpeM/CYbe8FL98n63T1bENFfNEgEotq/MfI/aBoPK2rZxsqeo0Ti1y54S/a+avdelpo9quATRrbg9/qslq7NTXQ7G2cWOTpJsXy/dRuTQ00iy+2uf1X8PINo64fNGsrJ5Y5fVkhujWz0MxXANtUf9hXTN5wO8tXfwDEd9ivp4FmvsyJZeK85er8BTj6ObCmwf78qUAzXgKGAkNHdHoVMBSgwi3AUIAmrTamcDN/iDDiSA9VuO40/hBlxJFG5ycS0zbxDyKMOHafHpuy1vMKNgJRRNx6zgI+MMNxCjbwjQgibn1OeE5Yacxj64EoIU53ndcdPjIvb/KznhcVSXERp35PYd83LhZ7lAfkvwjkMuIgLr7n6ofxb+GRFcbkO/xQDiK9DxsZ8OWB3jGm0HEmPeN5U9cBuYD0Kj2n/P2X+6ckEg+Wue745cZkm5z0JL1Jj0Ee/wLTBzQ97OqH1gAAAABJRU5ErkJggg==" | base64 -d > work/var/jb/Library/PreferenceBundles/KPCCursorPrefs.bundle/icon@2x.png
           echo "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" | base64 -d > work/var/jb/Library/PreferenceBundles/KPCCursorPrefs.bundle/icon@3x.png
-          sed -i 's/^Version: 1.0-0/Version: 1.0-2/' work/DEBIAN/control
+          sed -i 's/^Version: 1.0-0/Version: 1.0-3/' work/DEBIAN/control
           rm -f "$DEB"
           dpkg-deb -Z xz -b work "$DEB"
           echo "== 最终包文件清单 =="
@@ -49,5 +47,5 @@ jobs:
       - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: KPCursor-deb-1.0-2
+          name: KPCursor-deb-1.0-3
           path: cursor-tweak/packages/*.deb
