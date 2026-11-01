@@ -1,8 +1,8 @@
 Package: com.kpcursor.rootless
-Name: 便捷光标
-Version: 1.0-4
+Name: 便捷光标(诊断)
+Version: 1.0-5
 Architecture: iphoneos-arm64
-Description: 从屏幕底部上滑唤出鼠标式光标，拖动控制移动、轻点模拟点击，单手操控更方便。iOS 15+ rootless（Dopamine）适用。
+Description: 【诊断版，不会黑屏】只注入设置 App，加载后仅写日志，用来定位上一次的全机黑屏是加载环节还是业务逻辑。测试完请卸载。
 Maintainer: KPCursor <kpcursor@users.noreply.github.com>
 Author: KPCursor
 Section: Tweaks
