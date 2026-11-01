@@ -10,7 +10,8 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>从屏幕底部上滑唤出鼠标式光标，拖动控制移动，轻点模拟点击，方便单手操控。修改设置后即时生效，无需注销。</string>
+			<string>从屏幕底部上滑唤出鼠标式光标，拖动控制移动，轻点模拟点击，方便单手操控。修改设置后即时生效，无需注销。
+若出现异常：用 Filza 新建空文件 /var/mobile/Library/Preferences/com.kpcursor.disabled 再注销，即可彻底停用本插件。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -84,13 +85,13 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>默认300代表仅可从屏幕底部向上300像素区域内上滑激活，请根据分辨率调整</string>
+			<string>底部那条「隐形热区」的高度。值越大越好触发，但也会挡住更多正常触控，建议 40~80，默认 60。</string>
 		</dict>
 		<dict>
 			<key>showValue</key>
 			<true/>
 			<key>min</key>
-			<integer>200</integer>
+			<integer>20</integer>
 			<key>defaults</key>
 			<string>com.kpcursor</string>
 			<key>cell</key>
@@ -98,11 +99,11 @@
 			<key>key</key>
 			<string>activeHeight</string>
 			<key>max</key>
-			<integer>1000</integer>
+			<integer>200</integer>
 			<key>label</key>
 			<string>激活高度</string>
 			<key>default</key>
-			<integer>300</integer>
+			<integer>60</integer>
 		</dict>
 		<dict>
 			<key>label</key>

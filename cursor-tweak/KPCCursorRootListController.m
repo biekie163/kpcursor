@@ -1,5 +1,6 @@
 // KPCCursorRootListController.m — 便捷光标设置页控制器
 #import <Preferences/PSListController.h>
+#import <CoreFoundation/CoreFoundation.h>
 
 @interface KPCCursorRootListController : PSListController
 @end
@@ -15,8 +16,25 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // 纯 spec 页面，无需额外逻辑；修改设置后 tweak 通过
-    // NSUserDefaultsDidChangeNotification 自动生效，无需注销。
+}
+
+// Hero 关键修复：NSUserDefaultsDidChangeNotification 只在「本进程内」可靠，
+// 设置 App 改的是磁盘上的 com.kpcursor.plist，SpringBoard 里原来的监听基本收不到。
+// 这里改成跨进程的 Darwin 通知，改完立刻生效，不用注销。
+- (void)postPrefsChanged {
+    CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+                                         CFSTR("com.kpcursor.prefschanged"),
+                                         NULL, NULL, true);
+}
+
+- (void)setPreferenceValue:(id)value specifier:(PSSpecifier *)specifier {
+    [super setPreferenceValue:value specifier:specifier];
+    [self postPrefsChanged];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self postPrefsChanged];
 }
 
 @end
