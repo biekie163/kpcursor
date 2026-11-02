@@ -22,30 +22,51 @@ jobs:
 
       - name: Show toolchain
         run: |
-          set -e
-          xcode-select -p
-          clang --version
+          set -x
+          uname -a
           sw_vers
+          xcode-select -p
+          xcodebuild -version || true
+          clang --version || true
+          make --version | head -n 1 || true
 
       - name: Install Theos
         run: |
           set -e
-          # dpkg-deb 用于打包与校验；ldid 给 dylib 签名；xz 给 Theos 解工具链
-          brew install dpkg ldid xz || true
+          # 逐个装，任何一个失败都不连累其它（dpkg-deb 用来打包，ldid 用来签名）
+          brew install dpkg || true
+          brew install ldid || true
+          brew install xz || true
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
+      - name: Toolchain snapshot
+        run: |
+          set -x
+          echo "THEOS=$THEOS"
+          ls -la "$THEOS" || true
+          ls -la "$THEOS/bin" || true
+          command -v dpkg-deb || true
+          command -v ldid || true
+          command -v make || true
+          echo "SYSROOT:"; xcrun --sdk iphoneos --show-sdk-path || true
+
       - name: Build package
         run: |
-          set -e
-          # layout 目录必须是小写 layout（Theos 只认小写），资源交给 Theos 打包即可
-          make clean
-          make package FINALPACKAGE=1 ARCHS="arm64 arm64e"
+          set -o pipefail
+          make clean || true
+          if ! make package FINALPACKAGE=1 ARCHS="arm64 arm64e" 2>&1 | tee /tmp/build.log; then
+            echo "::error::BUILD FAILED — 最后 40 行如下"
+            tail -n 40 /tmp/build.log | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+            exit 1
+          fi
           ls -l packages/
 
       - name: Verify slices (arm64e present)
         run: |
-          set -e
+          set -o pipefail
           deb="$(ls packages/*.deb | head -n1)"
           tmp="$(mktemp -d)"
           dpkg-deb -x "$deb" "$tmp"
@@ -55,7 +76,10 @@ jobs:
           do
             echo "=== $f"
             file "$f"
-            python3 "$GITHUB_WORKSPACE/.github/scripts/check_macho.py" "$f"
+            if ! python3 "$GITHUB_WORKSPACE/.github/scripts/check_macho.py" "$f"; then
+              echo "::error::slice check failed for $f"
+              exit 1
+            fi
           done
 
       - name: Verify package layout
