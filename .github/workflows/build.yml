@@ -6,12 +6,29 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: cursor-tweak
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          set -e
+          sudo apt-get update
+          # 注意：不要换回 ubuntu-latest。2026-11 起 latest 指向 ubuntu-26.04，
+          # 该版本的 libxml2 改了包名（libxml2-16），Theos 自带安装脚本里
+          # `apt install libxml2` 会直接报 "Package 'libxml2' has no installation candidate"
+          # 导致整个 job 在装 Theos 这一步就失败（见 logs_112406007053.zip）。
+          sudo apt-get install -y --no-install-recommends \
+            build-essential fakeroot rsync curl perl zip git \
+            libssl-dev libxml2 libncurses-dev pkg-config xz-utils \
+            || sudo apt-get install -y --no-install-recommends \
+            build-essential fakeroot rsync curl perl zip git \
+            libssl-dev libxml2-16 libncurses-dev pkg-config xz-utils
+          # 老的 Linux 工具链偶尔还要 libtinfo5，装不上就算了（不影响编译）
+          sudo apt-get install -y --no-install-recommends libtinfo5 || true
 
       - name: Install Theos
         run: |
