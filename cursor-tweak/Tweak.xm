@@ -1,4 +1,4 @@
-// Tweak.xm — 便捷光标 (KPCursor) v1.0-6
+// Tweak.xm — 便捷光标 (KPCursor) v1.0-7
 //
 // 设计目标：在 SpringBoard 里绝不因为「插件自己的 bug」把系统搞死。
 //
@@ -27,6 +27,19 @@
 //
 // 修复：%ctor 的函数体里除了 libdispatch 的 C 接口，不允许出现任何 ObjC/Foundation
 // 调用；所有真正的初始化都甩进 dispatch_after 的主队列 block，等 App 跑起来再做。
+//
+// v1.0-7：1.0-6 装上去，设置 App 还是崩，但崩溃点往后挪了——
+//   readClass ← readClass ← map_images_nolock ← map_images
+//   ← dyld4::RuntimeState::notifyLoad ← dlopen_from ← libinjector injection_init
+//   异常码变成 EXC_BAD_ACCESS(SIGBUS) / subtype "UNKNOWN_0x105"。
+// UNKNOWN_0x105 是 arm64e 指针认证（ptrauth）校验失败的标准签名；而且 1.0-5 那次
+// 崩在 +[NSString stringWithFormat:] 里的 0xdac11950，和这次 readClass 里的
+// 0xdac11a30，是同一种「被 blend 坏掉的指针」——都不是我们代码逻辑的锅。
+// 拆包比对后确认：arm64e 切片带 LC_DYLD_CHAINED_FIXUPS（DYLD_CHAINED_PTR_ARM64E，
+// 有 ptrauth），arm64 切片走老式 LC_DYLD_INFO（无 ptrauth）。Linux 上的这套 Theos
+// 工具链产出的 arm64e 切片在 iOS 16.1.2 上签名验证不过，dyld 一映射 ObjC 元数据就崩。
+// 所以从这一版起 Makefile 里 ARCHS 只留 arm64（arm64 的 dylib 可以正常注入 arm64e 进程）。
+// %ctor 里不写 ObjC 这条约束继续保留，它本身也是对的。
 //
 // 日志：/var/mobile/Library/Logs/KPCursor.log
 

@@ -5,9 +5,17 @@
 export THEOS_PACKAGE_SCHEME = rootless
 
 TARGET := iphone:clang:latest:15.0
-# 必须同时出 arm64e：A12 及以上机型的 SpringBoard 是 arm64e 进程，
-# 只编 arm64 的话 dylib 根本不会被加载（表现为「装了完全没反应」）。
-ARCHS = arm64 arm64e
+# 【v1.0-7 起只编 arm64，这是刻意的，别改回去】
+# 两份真机崩溃日志（Preferences-2026-11-02-*.ips）都停在 ObjC 元数据映射阶段：
+#   1.0-5: +[NSString stringWithFormat:] ← KPCCursor.dylib  (SIGBUS UNKNOWN_0x105)
+#   1.0-6: readClass ← map_images_nolock ← dyld4::RuntimeState::notifyLoad
+# UNKNOWN_0x105 是 arm64e 指针认证（ptrauth）校验失败的典型签名。
+# 拆包看过：arm64e 切片用 LC_DYLD_CHAINED_FIXUPS + DYLD_CHAINED_PTR_ARM64E，
+# 而 arm64 切片用的是老的 LC_DYLD_INFO（没有 ptrauth）。
+# 也就是 Linux 上这套 Theos 工具链产出的 arm64e 切片在 iOS 16.1.2 上签名验证不过，
+# 只要 dyld 去映射它的 ObjC 元数据就崩 —— 跟 Tweak 写了什么无关（纯净探针版一样崩）。
+# arm64 切片没有 ptrauth，在 arm64e 进程里照样能 dlopen（App Store 的 App 全是 arm64）。
+ARCHS = arm64
 
 include $(THEOS)/makefiles/common.mk
 
