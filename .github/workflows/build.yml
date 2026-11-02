@@ -37,7 +37,22 @@ jobs:
           brew install dpkg || true
           brew install ldid || true
           brew install xz || true
-          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+          # install-theos 会从 GitHub Releases 拉 patched SDK，runner 上偶发下载失败（exit 8），
+          # 所以重试三次；它本身是幂等的，重复跑没问题。
+          ok=0
+          for i in 1 2 3; do
+            echo "=== install-theos attempt $i ==="
+            if bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"; then
+              ok=1
+              break
+            fi
+            echo "attempt $i failed, sleeping 15s..."
+            sleep 15
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::install-theos failed after 3 attempts (网络问题，重跑一次 workflow 即可)"
+            exit 1
+          fi
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
       - name: Toolchain snapshot
