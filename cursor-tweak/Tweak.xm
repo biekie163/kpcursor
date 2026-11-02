@@ -1,4 +1,4 @@
-// Tweak.xm — 便捷光标 (KPCursor) v1.0-7
+// Tweak.xm — 便捷光标 (KPCursor) v1.0-8
 //
 // 设计目标：在 SpringBoard 里绝不因为「插件自己的 bug」把系统搞死。
 //
@@ -40,6 +40,16 @@
 // 工具链产出的 arm64e 切片在 iOS 16.1.2 上签名验证不过，dyld 一映射 ObjC 元数据就崩。
 // 所以从这一版起 Makefile 里 ARCHS 只留 arm64（arm64 的 dylib 可以正常注入 arm64e 进程）。
 // %ctor 里不写 ObjC 这条约束继续保留，它本身也是对的。
+//
+// v1.0-8：上面这条「arm64 的 dylib 可以正常注入 arm64e 进程」是错的，真机上打脸了——
+// 1.0-7 装上去设置不崩了（说明 chained fixups 那套确实不能要），但：
+//   a) /var/mobile/Library/Logs/KPCursor.log 依然一个字都没有 ⇒ 插件根本没被加载；
+//   b) 设置里点「便捷光标」报「未能载入软件包 KPCursorPrefs，因为它已损坏或丢失必要的资源」
+//      ⇒ 连设置页那个 arm64-only 的 bundle 也加载不进去。
+// 结论：arm64e 进程（SpringBoard / 设置）只能装 arm64e 的镜像，arm64-only 会被 dyld 以
+// 「架构不匹配」拒绝（App Store 的 App 能跑是因为整个进程都是 arm64）。
+// 于是 v1.0-8 = arm64 + arm64e 双切片，但对 arm64e 强制关掉 chained fixups
+// （Makefile 里的 -Wl,-no_fixup_chains），让它回到没有 ptrauth 的老式 LC_DYLD_INFO。
 //
 // 日志：/var/mobile/Library/Logs/KPCursor.log
 
@@ -700,6 +710,56 @@ static void KPCOnPrefsChangedDarwin(CFNotificationCenterRef center, void *observ
 
 static void KPCBootstrap(void);
 
+// ============================================================================
+// 诊断横幅：只在「非 SpringBoard」进程里弹，用来肉眼确认插件到底有没有被加载。
+// （1.0-7 因为架构不对，插件静默地没加载，日志也没有，只能靠猜 —— 这次不猜了。）
+// 纯 UI 小窗，6 秒自动消失，userInteractionEnabled = NO，不会挡任何操作。
+// ============================================================================
+static void KPCShowLoadHUD(NSString *text) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        @try {
+            UIWindow *win = nil;
+            if (@available(iOS 13.0, *)) {
+                UIScene *scene = [UIApplication sharedApplication].connectedScenes.anyObject;
+                if ([scene isKindOfClass:[UIWindowScene class]]) {
+                    win = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
+                }
+            }
+            if (!win) {
+                win = [[UIWindow alloc] initWithFrame:CGRectMake(0, 0, 300, 60)];
+            } else {
+                win.frame = CGRectMake(0, 0, 300, 60);
+            }
+            win.windowLevel = UIWindowLevelAlert + 100;
+            win.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.78];
+            win.layer.cornerRadius = 12.0;
+            win.clipsToBounds = YES;
+            win.userInteractionEnabled = NO;
+
+            UILabel *lab = [[UILabel alloc] initWithFrame:win.bounds];
+            lab.text = text;
+            lab.textColor = [UIColor whiteColor];
+            lab.font = [UIFont boldSystemFontOfSize:13.0];
+            lab.textAlignment = NSTextAlignmentCenter;
+            lab.numberOfLines = 3;
+            [win addSubview:lab];
+
+            CGRect sb = [UIScreen mainScreen].bounds;
+            win.center = CGPointMake(sb.size.width / 2.0, sb.size.height * 0.22);
+            win.hidden = NO;
+
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                win.hidden = YES;
+            });
+            NSLog(@"[KPCursor] load HUD shown");
+        } @catch (NSException *e) {
+            NSLog(@"[KPCursor] HUD exception: %@", e);
+        }
+    });
+}
+
 %ctor {
     // 这里只有 GCD：没有 NSString、没有 NSFileManager、没有 NSLog。
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
@@ -728,8 +788,15 @@ static void KPCBootstrap(void) {
         @try {
             int boot = KPCReadBootCount() + 1;
             KPCWriteBootCount(boot);
-            KPLog(@"bootstrap: %@ boot=%d", [[NSBundle mainBundle] bundleIdentifier], boot);
+            NSString *bid = [[NSBundle mainBundle] bundleIdentifier];
+            KPLog(@"bootstrap: %@ boot=%d", bid, boot);
             KPLog(@"hid symbols: %s", KPCProbeHIDSymbols());
+
+            // 在设置 App 里做验证时，用一条可见横幅直接告诉我们「加载成功了」，
+            // 不用再去翻日志文件（设置 App 有沙箱，日志未必写得进去）。
+            if (![bid isEqualToString:@"com.apple.springboard"]) {
+                KPCShowLoadHUD([NSString stringWithFormat:@"KPCursor 已加载\n%@", bid ?: @"?"]);
+            }
 
             // 25 秒内没重启过 = 这次启动成功，清零计数。
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(25 * NSEC_PER_SEC)),

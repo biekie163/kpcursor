@@ -41,22 +41,23 @@ jobs:
           # 注意：layout 目录必须是小写 layout，Linux 文件系统区分大小写，
           # Theos 只认 layout/。资源文件交给 Theos 正常打包即可，不需要再手工塞一遍。
           make clean
-          make package FINALPACKAGE=1 ARCHS="arm64"
+          make package FINALPACKAGE=1 ARCHS="arm64 arm64e"
           ls -l packages/
 
-      - name: Verify dylib is arm64-only
+      - name: Verify slices (arm64e present, no chained fixups)
         run: |
           set -e
           deb="$(ls packages/*.deb | head -n1)"
           tmp="$(mktemp -d)"
           dpkg-deb -x "$deb" "$tmp"
-          dylib="$tmp/var/jb/Library/MobileSubstrate/DynamicLibraries/KPCCursor.dylib"
-          file "$dylib"
-          if file "$dylib" | grep -qi 'universal'; then
-            echo "::error::dylib 是 fat 二进制，必须只有 arm64 一个切片"
-            exit 1
-          fi
-          file "$dylib" | grep -qi 'arm64'
+          for f in \
+            "$tmp/var/jb/Library/MobileSubstrate/DynamicLibraries/KPCCursor.dylib" \
+            "$tmp/var/jb/Library/PreferenceBundles/KPCCursorPrefs.bundle/KPCCursorPrefs"
+          do
+            echo "=== $f"
+            file "$f"
+            python3 "$GITHUB_WORKSPACE/.github/scripts/check_macho.py" "$f"
+          done
 
       - name: Verify package layout
         run: |
@@ -69,6 +70,6 @@ jobs:
       - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: KPCursor-deb-1.0-7-arm64
+          name: KPCursor-deb-1.0-8
           path: cursor-tweak/packages/*.deb
           if-no-files-found: error

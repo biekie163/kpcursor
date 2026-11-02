@@ -5,17 +5,15 @@
 export THEOS_PACKAGE_SCHEME = rootless
 
 TARGET := iphone:clang:latest:15.0
-# 【v1.0-7 起只编 arm64，这是刻意的，别改回去】
-# 两份真机崩溃日志（Preferences-2026-11-02-*.ips）都停在 ObjC 元数据映射阶段：
-#   1.0-5: +[NSString stringWithFormat:] ← KPCCursor.dylib  (SIGBUS UNKNOWN_0x105)
-#   1.0-6: readClass ← map_images_nolock ← dyld4::RuntimeState::notifyLoad
-# UNKNOWN_0x105 是 arm64e 指针认证（ptrauth）校验失败的典型签名。
-# 拆包看过：arm64e 切片用 LC_DYLD_CHAINED_FIXUPS + DYLD_CHAINED_PTR_ARM64E，
-# 而 arm64 切片用的是老的 LC_DYLD_INFO（没有 ptrauth）。
-# 也就是 Linux 上这套 Theos 工具链产出的 arm64e 切片在 iOS 16.1.2 上签名验证不过，
-# 只要 dyld 去映射它的 ObjC 元数据就崩 —— 跟 Tweak 写了什么无关（纯净探针版一样崩）。
-# arm64 切片没有 ptrauth，在 arm64e 进程里照样能 dlopen（App Store 的 App 全是 arm64）。
-ARCHS = arm64
+# 【v1.0-8 起的架构策略，别乱改】
+# 1) 必须有 arm64e：A12 以上的系统进程（SpringBoard / 设置）是 arm64e，
+#    arm64-only 的 dylib 根本 dlopen 不进去。1.0-7 就是这个问题：设置不崩了，
+#    但插件其实没被加载（日志一个字都没有），设置页 bundle 也报「已损坏」。
+# 2) 但 arm64e 切片不能带 chained fixups：Linux 上这套 Theos 工具链产出的
+#    LC_DYLD_CHAINED_FIXUPS + DYLD_CHAINED_PTR_ARM64E 在 iOS 16.1.2 上验签失败，
+#    dyld 一映射 ObjC 元数据就 SIGBUS / UNKNOWN_0x105（1.0-5、1.0-6 的崩溃日志）。
+#    解法：强制回老式 LC_DYLD_INFO —— 链接参数 -Wl,-no_fixup_chains。
+ARCHS = arm64 arm64e
 
 include $(THEOS)/makefiles/common.mk
 
@@ -24,8 +22,9 @@ TWEAK_NAME = KPCCursor
 KPCCursor_FILES = Tweak.xm
 KPCCursor_FRAMEWORKS = UIKit
 KPCCursor_CFLAGS = -fobjc-arc -O2 -Wno-deprecated-declarations -Wno-unused-function
-# IOHID* 是私有符号，靠 dynamic_lookup 在运行时解析
-KPCCursor_LDFLAGS = -undefined dynamic_lookup
+# IOHID* 是私有符号，靠 dynamic_lookup 在运行时解析；
+# -no_fixup_chains 见文件顶部说明（arm64e 切片必须走 LC_DYLD_INFO）
+KPCCursor_LDFLAGS = -undefined dynamic_lookup -Wl,-no_fixup_chains
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
@@ -36,6 +35,8 @@ KPCCursorPrefs_INSTALL_PATH = /Library/PreferenceBundles
 KPCCursorPrefs_FRAMEWORKS = UIKit
 KPCCursorPrefs_PRIVATE_FRAMEWORKS = Preferences
 KPCCursorPrefs_CFLAGS = -fobjc-arc
+# 设置页 bundle 也要被装进 arm64e 的「设置」进程，同样不能用 chained fixups
+KPCCursorPrefs_LDFLAGS = -Wl,-no_fixup_chains
 
 include $(THEOS_MAKE_PATH)/bundle.mk
 
