@@ -55,13 +55,16 @@ jobs:
         run: |
           set -o pipefail
           make clean || true
-          if ! make package FINALPACKAGE=1 ARCHS="arm64 arm64e" 2>&1 | tee /tmp/build.log; then
-            echo "::error::BUILD FAILED — 最后 40 行如下"
-            tail -n 40 /tmp/build.log | while IFS= read -r line; do
+          if ! make package FINALPACKAGE=1 ARCHS="arm64 arm64e" > /tmp/build.log 2>&1; then
+            echo "=== 完整日志的最后 25 行 ==="
+            tail -n 25 /tmp/build.log
+            echo "=== 出错相关行（同时写进 annotation，方便直接看）==="
+            grep -n -i -E 'error|fatal|undefined|cannot|not found|No such|warning: .*deprecated' /tmp/build.log | head -n 8 | while IFS= read -r line; do
               echo "::error::${line}"
             done
             exit 1
           fi
+          tail -n 15 /tmp/build.log
           ls -l packages/
 
       - name: Verify slices (arm64e present)
