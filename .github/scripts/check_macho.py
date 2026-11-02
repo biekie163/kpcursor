@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-# 检查一个 Mach-O（thin 或 fat）的切片构成，专门服务于 KPCursor 的两个硬性要求：
-#   1) 必须带 arm64e 切片 —— A12+ 的系统进程是 arm64e，arm64-only 的镜像 dyld 不认；
-#   2) arm64e 切片不能带 LC_DYLD_CHAINED_FIXUPS —— Linux 工具链产出的 chained fixups
-#      在 iOS 16.1.2 上验签失败，dyld 一映射 ObjC 元数据就 SIGBUS/UNKNOWN_0x105。
-# 当年 1.0-5/1.0-6 的黑屏、1.0-7 的「装了没反应」，就是这两条之一没满足。
+# 检查一个 Mach-O（thin 或 fat）的切片构成，服务于 KPCursor 的硬性要求：
+#   必须带 arm64e 切片 —— A12+ 的系统进程（SpringBoard / 设置）是 arm64e，
+#   arm64-only 的镜像 dyld 根本不认，装上去的表现就是「没有任何反应」
+#   （1.0-7 就是这样：设置不闪退，但插件根本没被加载，日志一个字都没有）。
+#
+# 另外把每个切片的 fixups 方式打出来，方便排查：
+#   - dyld_chained_fixups=True  ：Apple ld64（macOS 构建）的正常产物，签名正确，可以用；
+#   - 只有 dyld_info=True        ：老式 LC_DYLD_INFO；
+#   - Linux 工具链也能产出 chained fixups，但 ptrauth 签名是坏的，
+#     在 iOS 16.1.2 上会 SIGBUS / UNKNOWN_0x105（1.0-5、1.0-6 的崩溃），
+#     所以本脚本不把「chained」当错误，真正的判据是「构建机是不是 macOS」
+#     （见 .github/workflows/build.yml 的注释）。
 import struct
 import sys
 
@@ -13,11 +20,10 @@ LC_DYLD_INFO_ONLY = 0x22 | LC_REQ_DYLD
 LC_DYLD_CHAINED_FIXUPS = 0x34 | LC_REQ_DYLD
 
 CPU_ARCH_ABI64 = 0x01000000
-CPU_TYPE_ARM64 = 12 | CPU_ARCH_ABI64
 SUBTYPE_MASK = 0xFF000000
 SUBTYPE_ARM64E = 2
 
-ARM64 = 0x0100000C
+ARM64 = 12 | CPU_ARCH_ABI64
 
 
 def arch_name(cputype, cpusub):
@@ -73,26 +79,18 @@ def main():
     data = open(path, "rb").read()
     slices = read_slices(data)
     has_arm64e = False
-    problems = []
     for cputype, cpusub, off, size in slices:
         name = arch_name(cputype, cpusub)
         cmds = load_commands(data, off)
         chained = LC_DYLD_CHAINED_FIXUPS in cmds
         classic = (LC_DYLD_INFO in cmds) or (LC_DYLD_INFO_ONLY in cmds)
-        print("%s: %s  size=%d  chained_fixups=%s  dyld_info=%s"
-              % (name, "arm64e" if (cputype == ARM64 and (cpusub & ~SUBTYPE_MASK) == SUBTYPE_ARM64E) else "-",
-                 size, chained, classic))
+        print("%s: size=%d  chained_fixups=%s  dyld_info=%s" % (name, size, chained, classic))
         if cputype == ARM64 and (cpusub & ~SUBTYPE_MASK) == SUBTYPE_ARM64E:
             has_arm64e = True
-            if chained:
-                problems.append("arm64e 切片带了 LC_DYLD_CHAINED_FIXUPS（iOS 16.1.2 上会 SIGBUS）")
     if not has_arm64e:
-        problems.append("没有 arm64e 切片（arm64-only 的镜像注入不了 SpringBoard/设置）")
-    if problems:
-        for p in problems:
-            print("::error::" + p)
+        print("::error::没有 arm64e 切片（arm64-only 的镜像注入不了 SpringBoard/设置）")
         return 1
-    print("OK: arm64e 切片存在，且走的是老式 LC_DYLD_INFO")
+    print("OK: arm64e 切片存在")
     return 0
 
 

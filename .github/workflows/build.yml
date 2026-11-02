@@ -6,45 +6,44 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    # 【必须用 macOS runner】
+    # Linux 上的 Theos 工具链链接不出「指针认证签名正确」的 arm64e 切片：
+    # 产出的 LC_DYLD_CHAINED_FIXUPS / DYLD_CHAINED_PTR_ARM64E 在 iOS 16.1.2 上验签失败，
+    # dyld 一映射 ObjC 元数据就 SIGBUS（Exception Subtype: UNKNOWN_0x105），
+    # 表现为 SpringBoard 黑屏循环、或设置 App 一打开就闪退（1.0-5、1.0-6）。
+    # Xcode 自带的 ld64 才能生成新 ABI 的 arm64e 二进制 —— 这是闭源工具，
+    # 只有 macOS 上有。参见 theos.dev 的 arm64e deployment 说明。
+    runs-on: macos-14
     defaults:
       run:
         working-directory: cursor-tweak
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Show toolchain
         run: |
           set -e
-          sudo apt-get update
-          # 注意：不要换回 ubuntu-latest。2026-11 起 latest 指向 ubuntu-26.04，
-          # 该版本的 libxml2 改了包名（libxml2-16），Theos 自带安装脚本里
-          # `apt install libxml2` 会直接报 "Package 'libxml2' has no installation candidate"
-          # 导致整个 job 在装 Theos 这一步就失败（见 logs_112406007053.zip）。
-          sudo apt-get install -y --no-install-recommends \
-            build-essential fakeroot rsync curl perl zip git \
-            libssl-dev libxml2 libncurses-dev pkg-config xz-utils \
-            || sudo apt-get install -y --no-install-recommends \
-            build-essential fakeroot rsync curl perl zip git \
-            libssl-dev libxml2-16 libncurses-dev pkg-config xz-utils
-          # 老的 Linux 工具链偶尔还要 libtinfo5，装不上就算了（不影响编译）
-          sudo apt-get install -y --no-install-recommends libtinfo5 || true
+          xcode-select -p
+          clang --version
+          sw_vers
 
       - name: Install Theos
         run: |
+          set -e
+          # dpkg-deb 用于打包与校验；ldid 给 dylib 签名；xz 给 Theos 解工具链
+          brew install dpkg ldid xz || true
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
       - name: Build package
         run: |
           set -e
-          # 注意：layout 目录必须是小写 layout，Linux 文件系统区分大小写，
-          # Theos 只认 layout/。资源文件交给 Theos 正常打包即可，不需要再手工塞一遍。
+          # layout 目录必须是小写 layout（Theos 只认小写），资源交给 Theos 打包即可
           make clean
           make package FINALPACKAGE=1 ARCHS="arm64 arm64e"
           ls -l packages/
 
-      - name: Verify slices (arm64e present, no chained fixups)
+      - name: Verify slices (arm64e present)
         run: |
           set -e
           deb="$(ls packages/*.deb | head -n1)"
@@ -70,6 +69,6 @@ jobs:
       - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: KPCursor-deb-1.0-8
+          name: KPCursor-deb-1.0-9
           path: cursor-tweak/packages/*.deb
           if-no-files-found: error

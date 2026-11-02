@@ -1,4 +1,4 @@
-// Tweak.xm — 便捷光标 (KPCursor) v1.0-8
+// Tweak.xm — 便捷光标 (KPCursor) v1.0-9
 //
 // 设计目标：在 SpringBoard 里绝不因为「插件自己的 bug」把系统搞死。
 //
@@ -50,6 +50,19 @@
 // 「架构不匹配」拒绝（App Store 的 App 能跑是因为整个进程都是 arm64）。
 // 于是 v1.0-8 = arm64 + arm64e 双切片，但对 arm64e 强制关掉 chained fixups
 // （Makefile 里的 -Wl,-no_fixup_chains），让它回到没有 ptrauth 的老式 LC_DYLD_INFO。
+// 结果：Linux 上的 ld64 不认这个参数（或关不掉链路），Build package 直接失败。
+//
+// v1.0-9：换工具链，不再跟链接参数较劲。
+// 关键资料：mikiyan1978「iPhone 単体で Theos 開発…」那篇记录的崩溃与我们 1.0-5
+// 完全相同（UNKNOWN_0x105 at 0x00000000dac11950、崩在 objc_msgSend 取 @"字面量" 的 isa），
+// 结论是：非 macOS 工具链无法为新 ABI 的 arm64e 生成正确的 ptrauth 签名，
+// 那份正确的链接逻辑在 Apple 的闭源 ld64 里（theos.dev 的 arm64e deployment 页也这么说）。
+// 所以这一版把构建机整个换成 macOS runner（macos-14，Xcode 自带 ld64）：
+//   - Makefile 恢复干净的 `LDFLAGS = -undefined dynamic_lookup`，ARCHS 仍是 arm64 + arm64e；
+//   - workflow 的 runs-on 改成 macos-14，去掉所有 -no_fixup_chains 相关的 hack；
+//   - check_macho.py 只要求「有 arm64e 切片」，不再禁止 chained fixups（macOS 产出的
+//     chained fixups 签名是对的，正是我们要的）。
+// 代码逻辑与 1.0-8 完全一致；这一版只改构建方式。
 //
 // 日志：/var/mobile/Library/Logs/KPCursor.log
 
